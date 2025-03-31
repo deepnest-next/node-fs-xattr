@@ -1,6 +1,6 @@
 // Will load a compiled build if present or a prebuild.
 // If no build if found it will throw an exception
-var addon = require('node-gyp-build')(__dirname)
+const addon = require('node-gyp-build')(__dirname)
 
 function validateArgument (key, val) {
   switch (key) {
@@ -88,4 +88,4 @@ module.exports = {
   setAttributeSync,
   listAttributesSync,
   removeAttributeSync
-};
+}
