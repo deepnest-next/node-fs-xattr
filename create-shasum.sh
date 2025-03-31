@@ -1,6 +1,6 @@
 #!/bin/bash
-
-find ./src -type f -print0 | sort -z | xargs -0 sha256sum > current-shasum.txt
+echo "">current-shasum.txt
+find ./src -type f -print0 | sort -z | xargs -0 sha256sum >> current-shasum.txt
 sha256sum ./build-* ./binding.gyp >> current-shasum.txt || true
 echo "ZZZZ:ENV:Node:${NODE_VERSION},Electron:${ELECTRON_VERSION}" >> current-shasum.txt
 
