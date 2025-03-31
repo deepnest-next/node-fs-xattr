@@ -2,7 +2,14 @@
   "name": "@deepnest/fs-xattr",
   "version": "0.4.1",
   "license": "MIT",
-  "repository": "deepnest-next/node-fs-xattr",
+  
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepnest-next/node-calculateNFP.git"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "main": "./index.js",
   "files": [
     "binding.gyp",
@@ -33,5 +40,16 @@
   },
   "os": [
     "!win32"
-  ]
+  ],
+  "funding": [
+    {
+      "type": "individual",
+      "url": "https://github.com/sponsors/Dexus"
+    },
+    {
+      "type": "patreon",
+      "url": "https://www.patreon.com/deepnest-next"
+    }
+  ],
+  "gypfile": true
 }
