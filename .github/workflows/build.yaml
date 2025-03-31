@@ -1,0 +1,174 @@
+name: Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release Version"
+        required: true
+        default: "0.40.1"
+      node_version:
+        description: "Node.js Version"
+        required: false
+        default: "20.18.1"
+      electron_version:
+        description: "Electron Version"
+        required: false
+        default: "32.2.7"
+
+env:
+  RELEASE_VERSION: ${{ inputs.version || '0.40.1' }}
+  NODE_VERSION: ${{ inputs.node_version || '20.18.1' }}
+  ELECTRON_VERSION: ${{ inputs.electron_version || '32.2.7' }}
+
+jobs:
+  compute-shasum:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Compute Sorted SHASUM
+        id: compute-shasum
+        run: |
+          # Generate SHASUM for all relevant files and sort them
+          chmod +x ./create-shasum.sh
+          ./create-shasum.sh
+
+          # Output the current SHASUM for the environment
+          echo "shasum256save=$(cat sha256.txt)" >> $GITHUB_ENV
+          echo "shasum256save=$(cat sha256.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Check for Existing SHASUM
+        id: check-shasum
+        run: |
+          if [ -f ./.last-shasum ]; then
+            echo "Previous SHASUM exists."
+            echo "------"
+            cat sha256.txt
+            echo "------"
+            cat .last-shasum
+            echo "------"
+            diff sha256.txt ./.last-shasum > /dev/null || exit 1
+          else
+            echo "No previous SHASUM found."
+            exit 1
+          fi
+
+    outputs:
+      status: ${{ steps.check-shasum.outcome }}
+      shasum256save: ${{ steps.compute-shasum.outputs.shasum256save }}
+
+  build:
+    needs: compute-shasum
+    if: ${{ needs.compute-shasum.outputs.status == 'failure' }}
+    strategy:
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-13, macOS-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: clone repository
+        uses: actions/checkout@v4
+
+      - name: install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: install dependencies
+        run: npm install
+
+      - name: run build script for ubuntu
+        if: startsWith(matrix.os,'ubuntu')
+        shell: bash
+        run: |
+          chmod +x build-linux.sh
+          ./build-linux.sh
+
+      - name: run build script for macOS
+        if: startsWith(matrix.os,'macOS')
+        shell: bash
+        run: |
+          chmod +x build-macos.sh
+          ./build-macos.sh
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.os }}
+          path: prebuilds/*
+
+  update-version-and-release:
+    needs: [compute-shasum, build]
+    if: ${{ needs.compute-shasum.outputs.status == 'failure' && needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref }}
+
+      - name: Bump Version
+        id: bump_version
+        run: |
+          echo "New version: $RELEASE_VERSION"
+          npm version $RELEASE_VERSION --no-git-tag-version
+          npm pkg fix
+
+          # Output new version for use in subsequent steps
+          echo "new_version=$RELEASE_VERSION" >> $GITHUB_ENV
+
+      - name: Commit Updated Version
+        run: |
+          echo "${{ needs.compute-shasum.outputs.shasum256save }}" > .last-shasum
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add package.json .last-shasum
+          git commit -m "chore: update version to ${{ env.new_version }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push Changes
+        run: git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: prebuilds
+          pattern: release-*
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ env.new_version }}"
+          name: "Release v${{ env.new_version }}"
+          body: |
+            ## Changes
+            - Automatic version bump to v${{ env.new_version }}.
+            - Automatic prebuilds for all platforms and architectures that use the Node.js in version ${{ env.NODE_VERSION }} and Electron in version ${{ env.ELECTRON_VERSION }}.
+          draft: false
+          prerelease: false
+          token: ${{ secrets.PAT_TOKEN }}
+          make_latest: true
+          files: |
+            prebuilds/*
+            .last-shasum
+
+      - name: Publish to npm
+        if: github.ref == 'refs/heads/main'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: "https://registry.npmjs.org/"
+
+      - name: Publish Package
+        if: github.ref == 'refs/heads/main'
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

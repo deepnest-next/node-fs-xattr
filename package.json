@@ -1,6 +1,6 @@
 {
-  "name": "fs-xattr",
-  "version": "0.4.0",
+  "name": "@deepnest/fs-xattr",
+  "version": "0.4.1",
   "license": "MIT",
   "repository": "LinusU/fs-xattr",
   "type": "module",
@@ -15,11 +15,18 @@
     "test": "standard && mocha && ts-readme-generator --check",
     "lint": "standard"
   },
+  "dependencies": {
+    "node-addon-api": "^8.3.1",
+    "node-gyp-build": "4.8.4"
+  },
   "devDependencies": {
     "fs-temp": "^1.1.2",
     "mocha": "^8.4.0",
     "standard": "^16.0.3",
-    "ts-readme-generator": "^0.4.3"
+    "ts-readme-generator": "^0.4.3",
+    "node-gyp": "11.1.0",
+    "prebuildify": "6.0.1",
+    "prebuildify-cross": "5.1.1"
   },
   "engines": {
     "node": "^12.20.0 || ^14.13.1 || >=16.0.0"
