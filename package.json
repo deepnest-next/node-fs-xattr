@@ -2,14 +2,14 @@
   "name": "@deepnest/fs-xattr",
   "version": "0.4.1",
   "license": "MIT",
-  "repository": "LinusU/fs-xattr",
-  "type": "module",
-  "exports": "./index.js",
+  "repository": "deepnest-next/node-fs-xattr",
+  "main": "./index.js",
   "files": [
     "binding.gyp",
     "index.d.ts",
     "index.js",
-    "src/"
+    "src/",
+    "prebuilds/"
   ],
   "scripts": {
     "test": "standard && mocha && ts-readme-generator --check",
