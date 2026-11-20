@@ -34,7 +34,7 @@ napi_value xattr_get_sync(napi_env env, napi_callback_info info) {
   if (value_length == -1) {
     free(filename);
     free(attribute);
-    assert(throw_xattr_error(env, errno) == napi_ok);
+    assert(throw_xattr_error(env, errno, 0) == napi_ok);
     return NULL;
   }
 
@@ -52,7 +52,7 @@ napi_value xattr_get_sync(napi_env env, napi_callback_info info) {
   free(attribute);
 
   if (value_length == -1) {
-    assert(throw_xattr_error(env, errno) == napi_ok);
+    assert(throw_xattr_error(env, errno, 0) == napi_ok);
     return NULL;
   }
 
@@ -88,7 +88,7 @@ napi_value xattr_set_sync(napi_env env, napi_callback_info info) {
   free(attribute);
 
   if (res == -1) {
-    assert(throw_xattr_error(env, errno) == napi_ok);
+    assert(throw_xattr_error(env, errno, 1) == napi_ok);
     return NULL;
   }
 
@@ -115,7 +115,7 @@ napi_value xattr_list_sync(napi_env env, napi_callback_info info) {
 
   if (result_length == -1) {
     free(filename);
-    assert(throw_xattr_error(env, errno) == napi_ok);
+    assert(throw_xattr_error(env, errno, 0) == napi_ok);
     return NULL;
   }
 
@@ -131,7 +131,7 @@ napi_value xattr_list_sync(napi_env env, napi_callback_info info) {
 
   if (result_length == -1) {
     free(result);
-    assert(throw_xattr_error(env, errno) == napi_ok);
+    assert(throw_xattr_error(env, errno, 0) == napi_ok);
     return NULL;
   }
 
@@ -168,7 +168,7 @@ napi_value xattr_remove_sync(napi_env env, napi_callback_info info) {
   free(attribute);
 
   if (res == -1) {
-    assert(throw_xattr_error(env, errno) == napi_ok);
+    assert(throw_xattr_error(env, errno, 0) == napi_ok);
     return NULL;
   }
 

@@ -12,13 +12,13 @@ There are already some libraries for this, why use `fs-xattr`?
 ## Installation
 
 ```sh
-npm install --save fs-xattr
+npm install --save @deepnest/fs-xattr
 ```
 
 ## Usage
 
 ```javascript
-import { getAttribute, setAttribute } from 'fs-xattr'
+import { getAttribute, setAttribute } from '@deepnest/fs-xattr'
 
 await setAttribute('index.js', 'user.linusu.test', 'Hello, World!')
 
