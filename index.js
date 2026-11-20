@@ -5,11 +5,11 @@ const addon = require('node-gyp-build')(__dirname)
 function validateArgument (key, val) {
   switch (key) {
     case 'path':
-      if (typeof val === 'string') return val
-      throw new TypeError('`path` must be a string')
     case 'attr':
-      if (typeof val === 'string') return val
-      throw new TypeError('`attr` must be a string')
+      if (typeof val !== 'string') throw new TypeError(`\`${key}\` must be a string`)
+      // C strings end at NUL, so 'a\0b' would silently act on 'a'
+      if (val.includes('\0')) throw new TypeError(`\`${key}\` must not contain null bytes`)
+      return val
     case 'value':
       if (typeof val === 'string') return Buffer.from(val)
       if (Buffer.isBuffer(val)) return val

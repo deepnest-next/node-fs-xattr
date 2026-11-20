@@ -97,7 +97,7 @@ const char* _error_code(int e) {
   }
 }
 
-napi_status create_xattr_error(napi_env env, int e, napi_value* result) {
+napi_status create_xattr_error(napi_env env, int e, int for_set, napi_value* result) {
   napi_status status;
 
   napi_value code;
@@ -105,7 +105,7 @@ napi_status create_xattr_error(napi_env env, int e, napi_value* result) {
   if (status != napi_ok) return status;
 
   napi_value msg;
-  status = napi_create_string_utf8(env, _error_description(e), NAPI_AUTO_LENGTH, &msg);
+  status = napi_create_string_utf8(env, for_set ? errorDescriptionForSet(e) : _error_description(e), NAPI_AUTO_LENGTH, &msg);
 
   napi_value error;
   status = napi_create_error(env, code, msg, &error);
@@ -122,11 +122,11 @@ napi_status create_xattr_error(napi_env env, int e, napi_value* result) {
   return napi_ok;
 }
 
-napi_status throw_xattr_error(napi_env env, int e) {
+napi_status throw_xattr_error(napi_env env, int e, int for_set) {
   napi_status status;
 
   napi_value error;
-  status = create_xattr_error(env, e, &error);
+  status = create_xattr_error(env, e, for_set, &error);
   if (status != napi_ok) return status;
 
   status = napi_throw(env, error);

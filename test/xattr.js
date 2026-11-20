@@ -53,6 +53,21 @@ describe('xattr#sync', function () {
     })
   })
 
+  it('should reject null bytes in path and attribute', function () {
+    assert.throws(() => xattr.setAttributeSync(path, 'user.a\0b', 'v'), TypeError)
+    assert.throws(() => xattr.getAttributeSync(path + '\0x', attribute0), TypeError)
+  })
+
+  it('should give set-specific error messages', function () {
+    // too long name: the get texts would say "too small to hold" / "exceeds"
+    const [code, message] = os.platform() === 'darwin' ? ['ENAMETOOLONG', /exceeded XATTR_MAXNAMELEN/] : ['ERANGE', /out of range/]
+    assert.throws(() => xattr.setAttributeSync(path, 'user.' + 'n'.repeat(300), 'v'), function (err) {
+      assert.strictEqual(err.code, code)
+      assert.match(err.message, message)
+      return true
+    })
+  })
+
   after(function (done) {
     fs.unlink(path, done)
   })

@@ -9,7 +9,6 @@ on:
       version:
         description: "Release Version"
         required: true
-        default: "0.40.1"
       node_version:
         description: "Node.js Version"
         required: false
@@ -20,7 +19,7 @@ on:
         default: "45.4.1"
 
 env:
-  RELEASE_VERSION: ${{ inputs.version || '0.40.1' }}
+  RELEASE_VERSION: ${{ inputs.version }}
   NODE_VERSION: ${{ inputs.node_version || '24' }}
   ELECTRON_VERSION: ${{ inputs.electron_version || '45.4.1' }}
 
@@ -83,19 +82,8 @@ jobs:
       - name: install dependencies
         run: npm install
 
-      - name: run build script for ubuntu
-        if: startsWith(matrix.os,'ubuntu')
-        shell: bash
-        run: |
-          chmod +x build-linux.sh
-          ./build-linux.sh
-
-      - name: run build script for macOS
-        if: startsWith(matrix.os,'macOS')
-        shell: bash
-        run: |
-          chmod +x build-macos.sh
-          ./build-macos.sh
+      - name: build prebuilds
+        run: bash build.sh
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v7
