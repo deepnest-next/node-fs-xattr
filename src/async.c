@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/xattr.h>
 
 #include "error.h"
@@ -15,6 +16,7 @@ typedef struct {
   int e;
   ssize_t value_length;
   char* value;
+  napi_async_work work;
 } XattrGetData;
 
 void xattr_get_execute(napi_env env, void* _data) {
@@ -48,20 +50,20 @@ void xattr_get_execute(napi_env env, void* _data) {
 void xattr_get_complete(napi_env env, napi_status status, void* _data) {
   XattrGetData* data = _data;
 
-  free(data->filename);
-  free(data->attribute);
-
   if (data->value_length == -1) {
     napi_value error;
     assert(create_xattr_error(env, data->e, &error) == napi_ok);
     assert(napi_reject_deferred(env, data->deferred, error) == napi_ok);
-    return;
+  } else {
+    napi_value buffer;
+    assert(napi_create_buffer_copy(env, data->value_length, data->value, NULL, &buffer) == napi_ok);
+    assert(napi_resolve_deferred(env, data->deferred, buffer) == napi_ok);
   }
 
-  napi_value buffer;
-  assert(napi_create_buffer_copy(env, data->value_length, data->value, NULL, &buffer) == napi_ok);
-  assert(napi_resolve_deferred(env, data->deferred, buffer) == napi_ok);
-
+  free(data->filename);
+  free(data->attribute);
+  free(data->value);
+  assert(napi_delete_async_work(env, data->work) == napi_ok);
   free(_data);
 }
 
@@ -70,7 +72,7 @@ napi_value xattr_get(napi_env env, napi_callback_info info) {
   napi_value args[2];
   assert(napi_get_cb_info(env, info, &argc, args, NULL, NULL) == napi_ok);
 
-  XattrGetData* data = malloc(sizeof(XattrGetData));
+  XattrGetData* data = calloc(1, sizeof(XattrGetData));
 
   size_t filename_length;
   assert(napi_get_value_string_utf8(env, args[0], NULL, 0, &filename_length) == napi_ok);
@@ -88,10 +90,9 @@ napi_value xattr_get(napi_env env, napi_callback_info info) {
   napi_value work_name;
   assert(napi_create_string_utf8(env, "fs-xattr:get", NAPI_AUTO_LENGTH, &work_name) == napi_ok);
 
-  napi_async_work work;
-  assert(napi_create_async_work(env, NULL, work_name, xattr_get_execute, xattr_get_complete, (void*) data, &work) == napi_ok);
+  assert(napi_create_async_work(env, NULL, work_name, xattr_get_execute, xattr_get_complete, (void*) data, &data->work) == napi_ok);
 
-  assert(napi_queue_async_work(env, work) == napi_ok);
+  assert(napi_queue_async_work(env, data->work) == napi_ok);
 
   return promise;
 }
@@ -103,6 +104,7 @@ typedef struct {
   int e;
   ssize_t value_length;
   char* value;
+  napi_async_work work;
 } XattrSetData;
 
 void xattr_set_execute(napi_env env, void* _data) {
@@ -124,20 +126,20 @@ void xattr_set_execute(napi_env env, void* _data) {
 void xattr_set_complete(napi_env env, napi_status status, void* _data) {
   XattrSetData* data = _data;
 
-  free(data->filename);
-  free(data->attribute);
-
   if (data->e != 0) {
     napi_value error;
     assert(create_xattr_error(env, data->e, &error) == napi_ok);
     assert(napi_reject_deferred(env, data->deferred, error) == napi_ok);
-    return;
+  } else {
+    napi_value undefined;
+    assert(napi_get_undefined(env, &undefined) == napi_ok);
+    assert(napi_resolve_deferred(env, data->deferred, undefined) == napi_ok);
   }
 
-  napi_value undefined;
-  assert(napi_get_undefined(env, &undefined) == napi_ok);
-  assert(napi_resolve_deferred(env, data->deferred, undefined) == napi_ok);
-
+  free(data->filename);
+  free(data->attribute);
+  free(data->value);
+  assert(napi_delete_async_work(env, data->work) == napi_ok);
   free(_data);
 }
 
@@ -146,7 +148,7 @@ napi_value xattr_set(napi_env env, napi_callback_info info) {
   napi_value args[3];
   assert(napi_get_cb_info(env, info, &argc, args, NULL, NULL) == napi_ok);
 
-  XattrSetData* data = malloc(sizeof(XattrSetData));
+  XattrSetData* data = calloc(1, sizeof(XattrSetData));
 
   size_t filename_length;
   assert(napi_get_value_string_utf8(env, args[0], NULL, 0, &filename_length) == napi_ok);
@@ -158,7 +160,14 @@ napi_value xattr_set(napi_env env, napi_callback_info info) {
   data->attribute = malloc(attribute_length + 1);
   assert(napi_get_value_string_utf8(env, args[1], data->attribute, attribute_length + 1, NULL) == napi_ok);
 
-  assert(napi_get_buffer_info(env, args[2], (void**) &data->value, (size_t*) &data->value_length) == napi_ok);
+  // copy the value: the JS buffer may be collected or reused before the worker thread runs
+  void* value;
+  size_t value_length;
+  assert(napi_get_buffer_info(env, args[2], &value, &value_length) == napi_ok);
+  data->value = malloc(value_length > 0 ? value_length : 1);
+  assert(data->value != NULL);
+  memcpy(data->value, value, value_length);
+  data->value_length = (ssize_t) value_length;
 
   napi_value promise;
   assert(napi_create_promise(env, &data->deferred, &promise) == napi_ok);
@@ -166,10 +175,9 @@ napi_value xattr_set(napi_env env, napi_callback_info info) {
   napi_value work_name;
   assert(napi_create_string_utf8(env, "fs-xattr:set", NAPI_AUTO_LENGTH, &work_name) == napi_ok);
 
-  napi_async_work work;
-  assert(napi_create_async_work(env, NULL, work_name, xattr_set_execute, xattr_set_complete, (void*) data, &work) == napi_ok);
+  assert(napi_create_async_work(env, NULL, work_name, xattr_set_execute, xattr_set_complete, (void*) data, &data->work) == napi_ok);
 
-  assert(napi_queue_async_work(env, work) == napi_ok);
+  assert(napi_queue_async_work(env, data->work) == napi_ok);
 
   return promise;
 }
@@ -180,6 +188,7 @@ typedef struct {
   int e;
   ssize_t result_length;
   char* result;
+  napi_async_work work;
 } XattrListData;
 
 void xattr_list_execute(napi_env env, void* _data) {
@@ -213,20 +222,19 @@ void xattr_list_execute(napi_env env, void* _data) {
 void xattr_list_complete(napi_env env, napi_status status, void* _data) {
   XattrListData* data = _data;
 
-  free(data->filename);
-
   if (data->result_length == -1) {
     napi_value error;
     assert(create_xattr_error(env, data->e, &error) == napi_ok);
     assert(napi_reject_deferred(env, data->deferred, error) == napi_ok);
-    return;
+  } else {
+    napi_value array;
+    assert(split_string_array(env, data->result, (size_t) data->result_length, &array) == napi_ok);
+    assert(napi_resolve_deferred(env, data->deferred, array) == napi_ok);
   }
 
-  napi_value array;
-  assert(split_string_array(env, data->result, (size_t) data->result_length, &array) == napi_ok);
-  assert(napi_resolve_deferred(env, data->deferred, array) == napi_ok);
-
+  free(data->filename);
   free(data->result);
+  assert(napi_delete_async_work(env, data->work) == napi_ok);
   free(_data);
 }
 
@@ -235,7 +243,7 @@ napi_value xattr_list(napi_env env, napi_callback_info info) {
   napi_value args[1];
   assert(napi_get_cb_info(env, info, &argc, args, NULL, NULL) == napi_ok);
 
-  XattrListData* data = malloc(sizeof(XattrListData));
+  XattrListData* data = calloc(1, sizeof(XattrListData));
 
   size_t filename_length;
   assert(napi_get_value_string_utf8(env, args[0], NULL, 0, &filename_length) == napi_ok);
@@ -248,10 +256,9 @@ napi_value xattr_list(napi_env env, napi_callback_info info) {
   napi_value work_name;
   assert(napi_create_string_utf8(env, "fs-xattr:list", NAPI_AUTO_LENGTH, &work_name) == napi_ok);
 
-  napi_async_work work;
-  assert(napi_create_async_work(env, NULL, work_name, xattr_list_execute, xattr_list_complete, (void*) data, &work) == napi_ok);
+  assert(napi_create_async_work(env, NULL, work_name, xattr_list_execute, xattr_list_complete, (void*) data, &data->work) == napi_ok);
 
-  assert(napi_queue_async_work(env, work) == napi_ok);
+  assert(napi_queue_async_work(env, data->work) == napi_ok);
 
   return promise;
 }
@@ -261,6 +268,7 @@ typedef struct {
   char* attribute;
   napi_deferred deferred;
   int e;
+  napi_async_work work;
 } XattrRemoveData;
 
 void xattr_remove_execute(napi_env env, void* _data) {
@@ -282,20 +290,19 @@ void xattr_remove_execute(napi_env env, void* _data) {
 void xattr_remove_complete(napi_env env, napi_status status, void* _data) {
   XattrRemoveData* data = _data;
 
-  free(data->filename);
-  free(data->attribute);
-
   if (data->e != 0) {
     napi_value error;
     assert(create_xattr_error(env, data->e, &error) == napi_ok);
     assert(napi_reject_deferred(env, data->deferred, error) == napi_ok);
-    return;
+  } else {
+    napi_value undefined;
+    assert(napi_get_undefined(env, &undefined) == napi_ok);
+    assert(napi_resolve_deferred(env, data->deferred, undefined) == napi_ok);
   }
 
-  napi_value undefined;
-  assert(napi_get_undefined(env, &undefined) == napi_ok);
-  assert(napi_resolve_deferred(env, data->deferred, undefined) == napi_ok);
-
+  free(data->filename);
+  free(data->attribute);
+  assert(napi_delete_async_work(env, data->work) == napi_ok);
   free(_data);
 }
 
@@ -304,7 +311,7 @@ napi_value xattr_remove(napi_env env, napi_callback_info info) {
   napi_value args[2];
   assert(napi_get_cb_info(env, info, &argc, args, NULL, NULL) == napi_ok);
 
-  XattrRemoveData* data = malloc(sizeof(XattrRemoveData));
+  XattrRemoveData* data = calloc(1, sizeof(XattrRemoveData));
 
   size_t filename_length;
   assert(napi_get_value_string_utf8(env, args[0], NULL, 0, &filename_length) == napi_ok);
@@ -322,10 +329,9 @@ napi_value xattr_remove(napi_env env, napi_callback_info info) {
   napi_value work_name;
   assert(napi_create_string_utf8(env, "fs-xattr:remove", NAPI_AUTO_LENGTH, &work_name) == napi_ok);
 
-  napi_async_work work;
-  assert(napi_create_async_work(env, NULL, work_name, xattr_remove_execute, xattr_remove_complete, (void*) data, &work) == napi_ok);
+  assert(napi_create_async_work(env, NULL, work_name, xattr_remove_execute, xattr_remove_complete, (void*) data, &data->work) == napi_ok);
 
-  assert(napi_queue_async_work(env, work) == napi_ok);
+  assert(napi_queue_async_work(env, data->work) == napi_ok);
 
   return promise;
 }

@@ -25,12 +25,12 @@
   },
   "devDependencies": {
     "fs-temp": "^1.1.2",
-    "mocha": "^8.4.0",
-    "standard": "^16.0.3",
-    "ts-readme-generator": "^0.4.3",
+    "mocha": "^11.8.0",
     "node-gyp": "11.1.0",
     "prebuildify": "6.0.1",
-    "prebuildify-cross": "5.1.1"
+    "prebuildify-cross": "5.1.1",
+    "standard": "^16.0.3",
+    "ts-readme-generator": "^0.4.3"
   },
   "engines": {
     "node": ">=20.0.0"

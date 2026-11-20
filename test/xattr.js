@@ -102,6 +102,51 @@ describe('xattr#async', function () {
     assert.strictEqual(err.code, os.platform() === 'darwin' ? 'ENOATTR' : 'ENODATA')
   })
 
+  it('should not read the value buffer after setAttribute returns', async function () {
+    const value = Buffer.alloc(2048, 0x41)
+    const pending = xattr.setAttribute(path, attribute0, value)
+    value.fill(0x42) // the caller may reuse the buffer right away
+    await pending
+
+    assert.ok((await xattr.getAttribute(path, attribute0)).equals(Buffer.alloc(2048, 0x41)))
+    await xattr.removeAttribute(path, attribute0)
+  })
+
+  after(function (done) {
+    fs.unlink(path, done)
+  })
+})
+
+describe('xattr#async memory', function () {
+  this.timeout(240000)
+
+  let path
+
+  before(function () {
+    path = temp.writeFileSync('')
+  })
+
+  it('does not grow rss when looping async calls', async function () {
+    const loop = async function (iterations) {
+      for (let i = 0; i < iterations; i++) {
+        await xattr.setAttribute(path, attribute0, payload0)
+        await xattr.getAttribute(path, attribute0)
+        await xattr.listAttributes(path)
+        await xattr.removeAttribute(path, attribute0)
+        await xattr.getAttribute(path, attribute0).catch(() => {}) // error path
+      }
+    }
+
+    await loop(10000) // warm-up, stabilises the allocator
+
+    const before = process.memoryUsage().rss
+    await loop(60000)
+    const growth = process.memoryUsage().rss - before
+
+    // unfixed build leaks ~0.5 kB per async call (~150 MB here)
+    assert(growth < 20 * 1024 * 1024, 'rss grew by ' + (growth / 1048576).toFixed(1) + ' MB')
+  })
+
   after(function (done) {
     fs.unlink(path, done)
   })
