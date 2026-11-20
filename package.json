@@ -11,10 +11,8 @@
   },
   "main": "./index.js",
   "files": [
-    "binding.gyp",
     "index.d.ts",
     "index.js",
-    "src/",
     "prebuilds/"
   ],
   "scripts": {
@@ -49,6 +47,5 @@
       "type": "patreon",
       "url": "https://www.patreon.com/deepnest-next"
     }
-  ],
-  "gypfile": true
+  ]
 }
