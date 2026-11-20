@@ -1,5 +1,8 @@
 name: Build
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:
@@ -103,6 +106,9 @@ jobs:
   update-version-and-release:
     needs: [compute-shasum, build]
     if: ${{ needs.compute-shasum.outputs.status == 'failure' && needs.build.result == 'success' }}
+    permissions:
+      contents: write
+      packages: write
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
