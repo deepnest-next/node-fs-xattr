@@ -96,6 +96,7 @@ jobs:
     if: ${{ needs.compute-shasum.outputs.status == 'failure' && needs.build.result == 'success' }}
     permissions:
       contents: write
+      id-token: write # npm trusted publishing (OIDC), no NPM_TOKEN
       packages: write
     runs-on: ubuntu-latest
     steps:
@@ -164,5 +165,3 @@ jobs:
       - name: Publish Package
         if: github.ref == 'refs/heads/master'
         run: npm publish
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
