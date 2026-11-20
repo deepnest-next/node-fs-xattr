@@ -52,7 +52,7 @@ void xattr_get_complete(napi_env env, napi_status status, void* _data) {
 
   if (data->value_length == -1) {
     napi_value error;
-    assert(create_xattr_error(env, data->e, &error) == napi_ok);
+    assert(create_xattr_error(env, data->e, 0, &error) == napi_ok);
     assert(napi_reject_deferred(env, data->deferred, error) == napi_ok);
   } else {
     napi_value buffer;
@@ -128,7 +128,7 @@ void xattr_set_complete(napi_env env, napi_status status, void* _data) {
 
   if (data->e != 0) {
     napi_value error;
-    assert(create_xattr_error(env, data->e, &error) == napi_ok);
+    assert(create_xattr_error(env, data->e, 1, &error) == napi_ok);
     assert(napi_reject_deferred(env, data->deferred, error) == napi_ok);
   } else {
     napi_value undefined;
@@ -224,7 +224,7 @@ void xattr_list_complete(napi_env env, napi_status status, void* _data) {
 
   if (data->result_length == -1) {
     napi_value error;
-    assert(create_xattr_error(env, data->e, &error) == napi_ok);
+    assert(create_xattr_error(env, data->e, 0, &error) == napi_ok);
     assert(napi_reject_deferred(env, data->deferred, error) == napi_ok);
   } else {
     napi_value array;
@@ -292,7 +292,7 @@ void xattr_remove_complete(napi_env env, napi_status status, void* _data) {
 
   if (data->e != 0) {
     napi_value error;
-    assert(create_xattr_error(env, data->e, &error) == napi_ok);
+    assert(create_xattr_error(env, data->e, 0, &error) == napi_ok);
     assert(napi_reject_deferred(env, data->deferred, error) == napi_ok);
   } else {
     napi_value undefined;
